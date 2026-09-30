@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABG Interpreter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main>
+<header>
+  <h1>ABG interpreter</h1>
+  <p>Enter arterial blood gas values. The app walks through the six-step anion gap approach, explains each value, and suggests differentials you can narrow with clinical findings.</p>
+</header>
+
+<section class="card" aria-labelledby="inp">
+  <h2 id="inp">Values</h2>
+  <div class="examples">Load an example:
+    <button type="button" data-ex="dka">DKA</button>
+    <button type="button" data-ex="copd">Chronic COPD</button>
+    <button type="button" data-ex="vomit">Vomiting</button>
+    <button type="button" data-ex="asa">Salicylate</button>
+  </div>
+  <div class="grid">
+    <label>pH<input id="ph" type="number" step="0.01" inputmode="decimal"></label>
+    <label>PaCO₂ (mmHg)<input id="pco2" type="number" step="0.1" inputmode="decimal"></label>
+    <label>HCO₃⁻ (mEq/L)<input id="hco3" type="number" step="0.1" inputmode="decimal"></label>
+    <label>Na⁺ (mEq/L)<input id="na" type="number" step="0.1" inputmode="decimal"></label>
+    <label>Cl⁻ (mEq/L)<input id="cl" type="number" step="0.1" inputmode="decimal"></label>
+    <label>Albumin (g/dL), optional<input id="alb" type="number" step="0.1" inputmode="decimal"></label>
+    <label>Glucose (mg/dL), optional<input id="glu" type="number" step="1" inputmode="decimal"></label>
+    <label>BUN (mg/dL), optional<input id="bun" type="number" step="1" inputmode="decimal"></label>
+    <label>Measured osmolality (mOsm/kg), optional<input id="osm" type="number" step="1" inputmode="decimal"></label>
+    <label>Respiratory disorder timing
+      <select id="tm"><option value="unknown">Unknown</option><option value="acute">Acute</option><option value="chronic">Chronic (3–5+ days)</option></select>
+    </label>
+  </div>
+  <div class="actions"><button id="go" type="button" class="primary">Interpret</button><button id="reset" type="button">Clear</button></div>
+  <p id="err" class="err" role="alert"></p>
+</section>
+
+<div id="out" hidden>
+  <section class="card summary" id="summary" aria-live="polite"></section>
+  <h2 class="sec">Step-by-step explanation</h2>
+  <div id="steps"></div>
+  <h2 class="sec">Differential diagnosis</h2>
+  <p class="hint">Tick the findings that apply to your patient. Differentials with more matching findings move to the top.</p>
+  <div id="dx"></div>
+</div>
+
+<footer>Educational tool based on the six-step anion gap approach. It does not replace clinical judgement. Verify results and treat the patient, not the numbers.</footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
