@@ -31,3 +31,12 @@ button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-wei
 .dx label{flex-direction:row;align-items:flex-start;gap:8px;color:var(--ink);font-size:.95rem;padding:3px 0}
 .dx input{margin-top:5px}
 footer{color:var(--mut);font-size:.85rem;margin-top:32px}
+
+textarea{font:inherit;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);resize:vertical}
+.history{margin-top:16px}
+.check{display:flex;flex-direction:row;align-items:baseline;gap:8px;margin-top:12px}
+[hidden]{display:none!important}
+input[type=file]{max-width:100%}
+button:disabled{cursor:wait;opacity:.65}
+#ai-result{white-space:pre-wrap}
+a{color:var(--acc)}
