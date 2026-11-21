@@ -1,22 +1,16 @@
 # ABG Interpreter
 
-Static web app (HTML/CSS/JS, no build step) that interprets an arterial blood gas using the six-step anion gap approach, explains each value, gives a summary, and ranks differential diagnoses from clinical findings.
-
-Educational use only. Not a medical device.
+Educational arterial blood gas workbench. Enter values manually or extract them from a de-identified JPEG, PNG, WebP or PDF (up to 3 MiB) with Claude. Review the extracted values before interpretation. The consistency precheck is followed by pH, primary disorder, compensation, anion gap and delta ratio. The history field supports optional Claude clinical correlation. Download the interpretation as a UTF-8 text report.
 
 ## Run locally
-    npx serve .
 
-## Push to GitHub
-    git init && git add . && git commit -m "ABG interpreter"
-    gh repo create abg-interpreter --public --source=. --push
-    # or: create an empty repo on github.com, then
-    # git remote add origin https://github.com/<you>/abg-interpreter.git && git push -u origin main
+Use `vercel dev` to exercise the API routes. A static server can serve the manual interpreter.
 
-## Deploy on Vercel
-Dashboard: vercel.com/new, import the GitHub repo, keep defaults (Framework: Other, no build command, output directory blank), click Deploy.
-CLI: `npm i -g vercel && vercel --prod`
-Every push to `main` then redeploys automatically.
+## Vercel setup
+
+Import the repository with the Other framework preset. Set `ANTHROPIC_API_KEY` as a server-side environment variable for the intended environments, then deploy. Optionally set `ANTHROPIC_MODEL` to a Claude model supporting images, PDFs and tool calls. The default is `claude-haiku-4-5-20251001`. Manual interpretation and text export are available without an API key.
+
+Use de-identified uploads and history. Claude receives the selected file during extraction and receives the entered values, history, and rule-based assessment only when correlation is enabled. The app does not store case data. The API's per-instance throttle is best effort. Set provider spending limits or apply deployment-level access controls before enabling AI on a public deployment.
 
 ## Formulas used (from the source guide)
 - [H+] = 24 x PaCO2 / HCO3
@@ -27,3 +21,5 @@ Every push to `main` then redeploys automatically.
 - Anion gap = Na - (Cl + HCO3); normal 12 +/-2, lowered 2.5 per 1 g/dL fall in albumin
 - Osmolal gap = measured - (2Na + glucose/18 + BUN/2.8); normal < 10
 - Delta ratio = change in AG / change in HCO3 (1 to 2 = uncomplicated AG acidosis)
+
+Clinical reference: [Merck Manual Professional Edition, Acid–Base Disorders](https://www.merckmanuals.com/professional/nephrology/acid-base-regulation-and-disorders/acid-base-disorders). Local laboratory reference intervals may differ.

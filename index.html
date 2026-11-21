@@ -12,8 +12,19 @@
 <main>
 <header>
   <h1>ABG interpreter</h1>
-  <p>Enter arterial blood gas values. The app walks through the six-step anion gap approach, explains each value, and suggests differentials you can narrow with clinical findings.</p>
+  <p>Enter arterial blood gas values or extract them from a report. Work through five acid–base interpretation steps and correlate the findings with the clinical history.</p>
 </header>
+
+<section class="card" aria-labelledby="upload-title">
+  <h2 id="upload-title">Extract values from a report</h2>
+  <p class="hint">Use a de-identified report. Claude receives the uploaded file when you select Extract values. Select one arterial sample per report.</p>
+  <label>ABG report (JPEG, PNG, WebP or PDF, up to 3 MiB)
+    <input id="report-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+  </label>
+  <div class="actions"><button id="extract" type="button">Extract values</button></div>
+  <p id="upload-status" role="status"></p>
+  <label id="review-row" class="check" hidden><input id="reviewed" type="checkbox">I checked the extracted values and units against the original arterial report.</label>
+</section>
 
 <section class="card" aria-labelledby="inp">
   <h2 id="inp">Values</h2>
@@ -27,8 +38,8 @@
     <label>pH<input id="ph" type="number" step="0.01" inputmode="decimal"></label>
     <label>PaCO₂ (mmHg)<input id="pco2" type="number" step="0.1" inputmode="decimal"></label>
     <label>HCO₃⁻ (mEq/L)<input id="hco3" type="number" step="0.1" inputmode="decimal"></label>
-    <label>Na⁺ (mEq/L)<input id="na" type="number" step="0.1" inputmode="decimal"></label>
-    <label>Cl⁻ (mEq/L)<input id="cl" type="number" step="0.1" inputmode="decimal"></label>
+    <label>Na⁺ (mEq/L), optional<input id="na" type="number" step="0.1" inputmode="decimal"></label>
+    <label>Cl⁻ (mEq/L), optional<input id="cl" type="number" step="0.1" inputmode="decimal"></label>
     <label>Albumin (g/dL), optional<input id="alb" type="number" step="0.1" inputmode="decimal"></label>
     <label>Glucose (mg/dL), optional<input id="glu" type="number" step="1" inputmode="decimal"></label>
     <label>BUN (mg/dL), optional<input id="bun" type="number" step="1" inputmode="decimal"></label>
@@ -37,6 +48,10 @@
       <select id="tm"><option value="unknown">Unknown</option><option value="acute">Acute</option><option value="chronic">Chronic (3–5+ days)</option></select>
     </label>
   </div>
+  <label class="history">Clinical history and findings, optional
+    <textarea id="history" rows="4" maxlength="3000" placeholder="Symptoms, time course, diagnoses, medications, oxygen or ventilator settings, and relevant labs"></textarea>
+  </label>
+  <label class="check"><input id="use-claude" type="checkbox">Send entered values and de-identified history to Claude for clinical correlation.</label>
   <div class="actions"><button id="go" type="button" class="primary">Interpret</button><button id="reset" type="button">Clear</button></div>
   <p id="err" class="err" role="alert"></p>
 </section>
@@ -45,12 +60,18 @@
   <section class="card summary" id="summary" aria-live="polite"></section>
   <h2 class="sec">Step-by-step explanation</h2>
   <div id="steps"></div>
+  <section class="card" id="correlation" hidden aria-labelledby="correlation-title">
+    <h2 id="correlation-title">Clinical correlation with Claude</h2>
+    <div id="ai-status" role="status"></div>
+    <p id="ai-result"></p>
+  </section>
+  <button id="download" type="button" hidden>Download report (.txt)</button>
   <h2 class="sec">Differential diagnosis</h2>
   <p class="hint">Tick the findings that apply to your patient. Differentials with more matching findings move to the top.</p>
   <div id="dx"></div>
 </div>
 
-<footer>Educational tool based on the six-step anion gap approach. It does not replace clinical judgement. Verify results and treat the patient, not the numbers.</footer>
+<footer>For education. Verify values, units, sample type and clinical findings before acting. <a href="https://www.merckmanuals.com/professional/nephrology/acid-base-regulation-and-disorders/acid-base-disorders">Acid–base reference</a>.</footer>
 </main>
 <script src="app.js"></script>
 </body>
