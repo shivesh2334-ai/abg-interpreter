@@ -64,16 +64,18 @@ function analyze(v) {
   const { ph, pco2, hco3 } = v;
   const add = (title, status, label, text) => steps.push({ title, status, label, text });
 
-  // Step 1
+  // Consistency precheck
   const hCalc = 24 * pco2 / hco3, hExp = Math.pow(10, 9 - ph), dev = Math.abs(hCalc - hExp) / hExp;
   const valid = dev <= 0.1;
-  add('Step 1. Internal consistency', valid ? 'ok' : 'bad', valid ? 'Consistent' : 'Inconsistent',
+  add('Precheck. Internal consistency', valid ? 'ok' : 'bad', valid ? 'Consistent' : 'Inconsistent',
     `Henderson-Hasselbalch: [H+] = 24 × PaCO₂ / HCO₃⁻ = 24 × ${pco2} / ${hco3} = ${r1(hCalc)} nmol/L. A pH of ${ph} corresponds to about ${r1(hExp)} nmol/L. ` +
-    (valid ? 'The values agree within 10%, so the gas is internally consistent.' : `They differ by ${Math.round(dev * 100)}%. The ABG is probably not valid: recheck the entered values or the sample.`));
+    (valid ? 'The values agree within 10%, so the gas is internally consistent.' : `They differ by ${Math.round(dev * 100)}%. Recheck the transcription, units and sample before interpreting.`));
+
+  if (!valid) return { steps, sum: ['Interpretation paused. Verify pH, PaCO₂ and actual bicarbonate against the same arterial sample.'], groups: [], valid };
 
   // Step 2
   const state = ph < 7.35 ? 'acidemia' : ph > 7.45 ? 'alkalemia' : 'normal';
-  add('Step 2. Acidemia or alkalemia?', state === 'normal' ? 'info' : 'warn', state === 'normal' ? 'pH normal' : state[0].toUpperCase() + state.slice(1),
+  add('Step 1. Acidemia or alkalemia?', state === 'normal' ? 'info' : 'warn', state === 'normal' ? 'pH normal' : state[0].toUpperCase() + state.slice(1),
     state === 'normal' ? `pH ${ph} is within 7.35 to 7.45. An acidosis or alkalosis can still be present, or two opposing disorders may cancel out, so PaCO₂, HCO₃⁻ and the anion gap are checked below.`
       : `pH ${ph} is ${state === 'acidemia' ? 'below 7.35' : 'above 7.45'}, which means ${state}. This usually reflects the primary disorder.`);
 
@@ -86,9 +88,9 @@ function analyze(v) {
   if (resp) primary.push(side === 'acid' ? 'racid' : 'ralk');
   if (met) primary.push(side === 'acid' ? 'metacid' : 'metalk');
   const dirTxt = `pH is ${ph < 7.40 ? 'low' : 'high'} and PaCO₂ is ${pco2 > 40 ? 'high' : pco2 < 40 ? 'low' : 'normal'} (${pco2} mmHg); HCO₃⁻ is ${hco3 < 24 ? 'low' : hco3 > 24 ? 'high' : 'normal'} (${hco3} mEq/L). Respiratory disorders move pH and PaCO₂ in opposite directions; metabolic disorders move them in the same direction.`;
-  if (!primary.length) add('Step 3. Respiratory or metabolic?', 'ok', 'No primary disorder', dirTxt + ' No primary acid-base disturbance is evident from pH, PaCO₂ and HCO₃⁻. A hidden anion gap disorder is still checked below.');
-  else if (primary.length === 2) add('Step 3. Respiratory or metabolic?', 'bad', 'Mixed disorder', dirTxt + ` Both PaCO₂ and HCO₃⁻ push pH the same way: combined ${NAMES[primary[0]]} and ${NAMES[primary[1]]}.`);
-  else add('Step 3. Respiratory or metabolic?', 'warn', 'Primary ' + NAMES[primary[0]], dirTxt + ` The pattern indicates a primary ${NAMES[primary[0]]}.`);
+  if (!primary.length) add('Step 2. Respiratory or metabolic?', 'ok', 'No primary disorder', dirTxt + ' No primary acid-base disturbance is evident from pH, PaCO₂ and HCO₃⁻. A hidden anion gap disorder is still checked below.');
+  else if (primary.length === 2) add('Step 2. Respiratory or metabolic?', 'bad', 'Mixed disorder', dirTxt + ` Both PaCO₂ and HCO₃⁻ push pH the same way: combined ${NAMES[primary[0]]} and ${NAMES[primary[1]]}.`);
+  else add('Step 2. Respiratory or metabolic?', 'warn', 'Primary ' + NAMES[primary[0]], dirTxt + ` The pattern indicates a primary ${NAMES[primary[0]]}.`);
   primary.forEach(p => dis.add(p));
 
   // Step 4
@@ -116,7 +118,7 @@ function analyze(v) {
       const hiEdge = acid ? Math.max(ac[1], ch[1]) : ac[1], loEdge = acid ? ac[0] : ch[0];
       let cls;
       if (tm === 'acute') cls = inR(ac) ? 'acute' : hco3 > ac[1] ? 'high' : 'low';
-      else if (tm === 'chronic') cls = inR(ch) ? 'chronic' : (acid ? hco3 > ch[1] : hco3 > ac[1]) ? 'high' : 'low';
+      else if (tm === 'chronic') cls = inR(ch) ? 'chronic' : hco3 > ch[1] ? 'high' : 'low';
       else cls = inR(ac) ? 'acute' : inR(ch) ? 'chronic' : (hco3 > Math.min(ac[1], ch[1]) && hco3 < Math.max(ac[0], ch[0])) ? 'sub' : hco3 > hiEdge ? 'high' : 'low';
       if (cls === 'acute' || cls === 'chronic') txt += ` Fits an ${cls} ${NAMES[p]} with appropriate compensation.` + (tm === 'unknown' ? ' Timing was inferred from HCO₃⁻; confirm it clinically.' : '');
       else if (cls === 'sub') { status = 'info'; label = 'Subacute'; txt += ' HCO₃⁻ falls between the acute and chronic ranges: partial compensation, likely subacute.'; }
@@ -124,8 +126,8 @@ function analyze(v) {
       else { dis.add('metacid'); status = 'bad'; label = 'Extra metabolic acidosis'; txt += ' HCO₃⁻ is lower than expected: a concurrent metabolic acidosis.'; }
       if (cls === 'acute' || cls === 'chronic') label = 'Appropriate (' + cls + ')';
     }
-    add('Step 4. Compensation', status, label, txt + ' Compensation usually does not return pH fully to normal.');
-  } else add('Step 4. Compensation', primary.length ? 'warn' : 'info', 'Not applicable', primary.length ? 'With two primary disorders, expected-compensation formulas cannot be applied. Interpret the combined pattern as shown in Step 3.' : 'No primary disorder to compensate.');
+    add('Step 3. Compensation', status, label, txt + ' Compensation usually does not return pH fully to normal.');
+  } else add('Step 3. Compensation', primary.length ? 'warn' : 'info', 'Not applicable', primary.length ? 'With two primary disorders, expected-compensation formulas cannot be applied. Interpret the combined pattern as shown in Step 2.' : 'No primary disorder to compensate.');
 
   // Step 5 and 6
   let ag = null, base = 12, elevated = false;
@@ -141,23 +143,23 @@ function analyze(v) {
       const calc = 2 * v.na + v.glu / 18 + v.bun / 2.8, og = v.osm - calc;
       t += ` Osmolal gap = ${v.osm} − ${r1(calc)} = ${r1(og)} (normal below 10). ` + (og >= 10 ? 'Elevated: consider toxic alcohols (methanol, ethylene glycol), ethanol, or an unmeasured osmole.' : 'Normal.');
     } else if (elevated) t += ' If the cause is not obvious (DKA, lactic acidosis, renal failure) or a toxic ingestion is suspected, add glucose, BUN and measured osmolality to calculate the osmolal gap.';
-    add('Step 5. Anion gap', elevated ? 'bad' : 'ok', elevated ? 'Elevated' : 'Normal', t);
+    add('Step 4. Anion gap', elevated ? 'bad' : 'ok', elevated ? 'Elevated' : 'Normal', t);
     if (elevated) {
       groups.add('AGMA');
       const dAG = ag - base, dH = 24 - hco3;
-      if (dH <= 0) { dis.add('metalk'); add('Step 6. Delta ratio', 'bad', 'Concurrent metabolic alkalosis', `ΔAG = ${r1(dAG)} but HCO₃⁻ (${hco3}) has not fallen below 24. A raised gap without a matching fall in bicarbonate suggests a concurrent metabolic alkalosis.`); }
+      if (dH <= 0) { dis.add('metalk'); add('Step 5. Delta ratio', 'bad', 'Concurrent metabolic alkalosis', `ΔAG = ${r1(dAG)} but HCO₃⁻ (${hco3}) has not fallen below 24. A raised gap without a matching fall in bicarbonate suggests a concurrent metabolic alkalosis.`); }
       else {
         const ratio = dAG / dH;
         let s = 'ok', l = 'Uncomplicated AG acidosis', x = 'This is within 1.0 to 2.0: an uncomplicated anion gap metabolic acidosis.';
         if (ratio < 1) { groups.add('NAGMA'); s = 'bad'; l = 'Plus non-AG acidosis'; x = 'Below 1.0: a concurrent non-anion gap metabolic acidosis is likely.'; }
         else if (ratio > 2) { dis.add('metalk'); s = 'bad'; l = 'Plus metabolic alkalosis'; x = 'Above 2.0: a concurrent metabolic alkalosis is likely.'; }
-        add('Step 6. Delta ratio', s, l, `ΔAG/ΔHCO₃⁻ = ${r1(dAG)} / ${r1(dH)} = ${r1(ratio)}. ${x}`);
+        add('Step 5. Delta ratio', s, l, `ΔAG/ΔHCO₃⁻ = ${r1(dAG)} / ${r1(dH)} = ${r1(ratio)}. ${x}`);
       }
-    } else add('Step 6. Delta ratio', 'info', 'Not needed', 'The anion gap is not elevated, so the ΔAG/ΔHCO₃⁻ ratio is not calculated.');
+    } else add('Step 5. Delta ratio', 'info', 'Not needed', 'The anion gap is not elevated, so the ΔAG/ΔHCO₃⁻ ratio is not calculated.');
     if (dis.has('metacid') && !elevated) groups.add('NAGMA');
   } else {
-    add('Step 5. Anion gap', 'info', 'Na⁺ and Cl⁻ needed', 'Enter Na⁺ and Cl⁻ to calculate the anion gap. It is most important when a metabolic acidosis is present, and can uncover a hidden one when pH is normal.');
-    add('Step 6. Delta ratio', 'info', 'Needs anion gap', 'The delta ratio requires an elevated anion gap.');
+    add('Step 4. Anion gap', 'info', 'Na⁺ and Cl⁻ needed', 'Enter Na⁺ and Cl⁻ to calculate the anion gap. It is most important when a metabolic acidosis is present, and can uncover a hidden one when pH is normal.');
+    add('Step 5. Delta ratio', 'info', 'Needs anion gap', 'The delta ratio requires an elevated anion gap.');
     if (dis.has('metacid')) groups.add('NAGMA'), groups.add('AGMA');
   }
   if (dis.has('metalk')) groups.add('METALK');
@@ -174,10 +176,10 @@ function analyze(v) {
     const extra = list.filter(n => !(primary.length === 1 && n === NAMES[primary[0]]));
     if (primary.length === 2 || !primary.length) sum.push('Disorders identified: ' + list.join(', ') + '.');
     else if (extra.length) sum.push('Additional disorder(s): ' + extra.join(', ') + ', so this is a mixed acid-base disturbance.');
-    else sum.push('Compensation is appropriate: a simple disorder.');
+    else if (steps[3].status === 'ok' && !groups.has('NAGMA') && !groups.has('AGMA')) sum.push('The observed compensation is within the expected range.');
   }
   if (ag != null) sum.push(`Anion gap ${r1(ag)} (${elevated ? 'elevated' : 'normal'}).`);
-  return { steps, sum, groups: [...['AGMA', 'NAGMA', 'METALK', 'RACID', 'RALK'].filter(g => groups.has(g))] };
+  return { steps, sum, valid, groups: [...['AGMA', 'NAGMA', 'METALK', 'RACID', 'RALK'].filter(g => groups.has(g))] };
 }
 
 const checked = new Set();
@@ -198,22 +200,171 @@ function renderDx(groups) {
   });
 }
 
-function run() {
-  const v = { ph: num('ph'), pco2: num('pco2'), hco3: num('hco3'), na: num('na'), cl: num('cl'), alb: num('alb'), glu: num('glu'), bun: num('bun'), osm: num('osm'), tm: $('tm').value };
+const fields = ['ph', 'pco2', 'hco3', 'na', 'cl', 'alb', 'glu', 'bun', 'osm'];
+const maxFile = 3 * 1024 * 1024;
+let generation = 0;
+let extractionPending = false;
+let report = null;
+
+function invalidate() {
+  generation++;
+  report = null;
+  $('out').hidden = true;
+  $('download').hidden = true;
+  $('ai-result').textContent = '';
+  $('ai-status').textContent = '';
   $('err').textContent = '';
-  if (v.ph == null || v.pco2 == null || v.hco3 == null) { $('err').textContent = 'Enter pH, PaCO₂ and HCO₃⁻ to continue.'; return; }
-  if (v.ph < 6.5 || v.ph > 8 || v.pco2 <= 0 || v.hco3 <= 0) { $('err').textContent = 'One or more values are outside a plausible range. Check the units.'; return; }
+}
+
+async function requestClaude(payload) {
+  const response = await fetch('/api/abg', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) throw new Error(data?.error || 'Claude is unavailable. Try again or use manual interpretation.');
+  return data;
+}
+
+async function extract() {
+  const file = $('report-file').files[0];
+  if (!file || !['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > maxFile || !file.size) {
+    $('upload-status').textContent = 'Select a JPEG, PNG, WebP or PDF report up to 3 MiB.';
+    return;
+  }
+
+  invalidate();
+  const current = generation;
+  extractionPending = true;
+  $('extract').disabled = true;
+  $('upload-status').textContent = 'Extracting values with Claude…';
+  try {
+    const encoded = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('Could not read this file.'));
+      reader.readAsDataURL(file);
+    });
+    if (current !== generation) return;
+    const { values } = await requestClaude({ action: 'extract', type: file.type, data: encoded });
+    if (current !== generation) return;
+    for (const key of fields) $(key).value = values[key] ?? '';
+    $('tm').value = 'unknown';
+    $('review-row').hidden = false;
+    $('reviewed').checked = false;
+    $('upload-status').textContent = 'Compare all values with the report. Enter any missing values manually.';
+  } catch (error) {
+    if (current === generation) $('upload-status').textContent = error.message;
+  } finally {
+    extractionPending = false;
+    $('extract').disabled = false;
+    if ($('upload-status').textContent === 'Extracting values with Claude…') $('upload-status').textContent = '';
+  }
+}
+
+async function run() {
+  if (extractionPending) return;
+  invalidate();
+  const current = generation;
+  if (!$('review-row').hidden && !$('reviewed').checked) {
+    $('err').textContent = 'Verify the extracted values and units before interpreting.';
+    return;
+  }
+  const v = Object.fromEntries(fields.map(key => [key, num(key)]));
+  v.tm = $('tm').value;
+  if ([v.ph, v.pco2, v.hco3].includes(null)) {
+    $('err').textContent = 'Enter pH, PaCO₂ and actual HCO₃⁻ to continue.';
+    return;
+  }
+  if (fields.some(key => $(key).validity.badInput || (v[key] !== null && (!Number.isFinite(v[key]) || v[key] < 0))) ||
+      v.ph < 6.5 || v.ph > 8 || v.pco2 <= 0 || v.hco3 <= 0) {
+    $('err').textContent = 'One or more values are outside a plausible range. Check the units.';
+    return;
+  }
+
   const r = analyze(v);
   $('summary').innerHTML = '<h2>Summary interpretation</h2>' + r.sum.map(s => `<p>${s}</p>`).join('');
   $('steps').innerHTML = r.steps.map(s => `<div class="step"><h3>${s.title}<span class="pill ${s.status}">${s.label}</span></h3><p>${s.text}</p></div>`).join('');
-  checked.clear(); renderDx(r.groups);
-  $('out').hidden = false; $('summary').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  checked.clear();
+  renderDx(r.groups);
+  const useClaude = r.valid && $('use-claude').checked;
+  $('correlation').hidden = !useClaude;
+  $('out').hidden = false;
+  $('summary').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!r.valid) return;
+
+  const history = $('history').value.trim();
+  report = { values: v, result: r, history, correlation: '' };
+  $('download').hidden = useClaude;
+  if (!useClaude) return;
+  $('ai-status').textContent = 'Generating clinical correlation…';
+  try {
+    const data = await requestClaude({ action: 'interpret', values: v, history, assessment: r });
+    if (current !== generation) return;
+    report.correlation = data.correlation;
+    $('ai-result').textContent = data.correlation;
+    $('ai-status').textContent = '';
+  } catch (error) {
+    if (current === generation) $('ai-status').textContent = error.message;
+  } finally {
+    if (current === generation) $('download').hidden = false;
+  }
+}
+
+function download() {
+  if (!report) return;
+  const { values, result, history, correlation } = report;
+  const units = ['pH', 'PaCO₂ (mmHg)', 'HCO₃⁻ (mEq/L)', 'Na⁺ (mEq/L)', 'Cl⁻ (mEq/L)', 'Albumin (g/dL)', 'Glucose (mg/dL)', 'BUN (mg/dL)', 'Measured osmolality (mOsm/kg)'];
+  const lines = ['ABG interpretation | Educational use', new Date().toISOString(), '',
+    ...fields.map((key, i) => `${units[i]}: ${values[key] ?? 'Not entered'}`),
+    `Respiratory timing: ${values.tm}`, '', 'Summary', ...result.sum,
+    ...result.steps.flatMap(step => ['', step.title, step.label, step.text])];
+  if (history) lines.push('', 'Entered clinical history', history);
+  if (checked.size) lines.push('', 'Selected differential findings',
+    ...[...checked].map(key => key.split('|').slice(1).join(' — ')));
+  if (correlation) lines.push('', 'Clinical correlation with Claude', correlation);
+  lines.push('', 'Verify results and clinical context before acting.');
+  const href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = 'abg-interpretation.txt';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+
+function clearCase() {
+  invalidate();
+  for (const key of fields) $(key).value = '';
+  $('tm').value = 'unknown';
+  $('history').value = '';
+  $('use-claude').checked = false;
+  $('report-file').value = '';
+  $('upload-status').textContent = '';
+  $('review-row').hidden = true;
+  $('reviewed').checked = false;
+  checked.clear();
 }
 
 $('go').addEventListener('click', run);
-$('reset').addEventListener('click', () => { document.querySelectorAll('input[type=number]').forEach(i => i.value = ''); $('tm').value = 'unknown'; $('out').hidden = true; $('err').textContent = ''; });
-document.querySelectorAll('[data-ex]').forEach(b => b.addEventListener('click', () => {
-  document.querySelectorAll('input[type=number]').forEach(i => i.value = '');
-  const e = EXAMPLES[b.dataset.ex]; Object.keys(e).forEach(k => $(k).value = e[k]); run();
+$('reset').addEventListener('click', clearCase);
+$('extract').addEventListener('click', extract);
+$('download').addEventListener('click', download);
+$('report-file').addEventListener('change', () => {
+  invalidate();
+  $('upload-status').textContent = $('review-row').hidden ? '' : 'Displayed values are from the previous extraction. Extract the new report or clear the case.';
+  if (!$('review-row').hidden) $('reviewed').checked = false;
+});
+for (const id of [...fields, 'history', 'tm', 'reviewed', 'use-claude']) {
+  $(id).addEventListener('input', invalidate);
+}
+document.querySelectorAll('[data-ex]').forEach(button => button.addEventListener('click', () => {
+  clearCase();
+  for (const [key, value] of Object.entries(EXAMPLES[button.dataset.ex])) $(key).value = value;
+  run();
 }));
-document.querySelectorAll('input[type=number]').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') run(); }));
+for (const key of fields) $(key).addEventListener('keydown', event => {
+  if (event.key === 'Enter') run();
+});
